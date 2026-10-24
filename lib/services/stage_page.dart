@@ -29,6 +29,16 @@ const String stagePageHtml = r'''<!doctype html>
   #idle{display:flex;height:100vh;flex-direction:column;align-items:center;justify-content:center;gap:3vh;text-align:center;padding:4vh;}
   #idle h1{font-size:7vh;margin:0;background:linear-gradient(135deg,var(--v),var(--p));-webkit-background-clip:text;background-clip:text;color:transparent;}
   #idle p{font-size:3vh;color:#9CA3AF;margin:0;}
+  #result{display:none;height:100vh;flex-direction:column;align-items:center;justify-content:center;gap:1.2vh;text-align:center;padding:4vh;}
+  #rSinger{font-size:4vh;font-weight:800;}
+  #rScore{font-size:22vh;font-weight:800;line-height:1;background:linear-gradient(135deg,var(--v),var(--p));-webkit-background-clip:text;background-clip:text;color:transparent;}
+  #rLabel{font-size:5vh;font-weight:800;}
+  #rSong{font-size:2.6vh;color:#9CA3AF;}
+  #rBars{width:60vw;max-width:820px;margin-top:2vh;}
+  .rbar{margin:1.2vh 0;}
+  .rbl{display:flex;justify-content:space-between;font-size:2.4vh;margin-bottom:.6vh;}
+  .rtrack{height:2vh;border-radius:999px;background:rgba(255,255,255,.15);overflow:hidden;}
+  .rfill{height:100%;background:linear-gradient(90deg,var(--v),var(--p));}
 </style>
 </head>
 <body>
@@ -45,6 +55,14 @@ const String stagePageHtml = r'''<!doctype html>
       </div>
     </div>
     <div id="side"><h2>Punktestand</h2><div id="board"></div></div>
+  </div>
+
+  <div id="result">
+    <div id="rSinger"></div>
+    <div id="rScore">0</div>
+    <div id="rLabel"></div>
+    <div id="rBars"></div>
+    <div id="rSong"></div>
   </div>
 
   <script src="https://www.youtube.com/iframe_api"></script>
@@ -90,11 +108,24 @@ const String stagePageHtml = r'''<!doctype html>
       });
     }
 
+    function ratingLabel(score){
+      if(score >= 85) return '🌟 Superstar';
+      if(score >= 70) return 'Stark!';
+      if(score >= 50) return 'Solide';
+      if(score >= 30) return 'Geht noch';
+      return 'Mutig!';
+    }
+    function bar(label, v){
+      var pct = Math.round(Math.max(0, Math.min(1, v || 0)) * 100);
+      return '<div class="rbar"><div class="rbl"><span>' + label + '</span><span>' + pct + '%</span></div>'
+        + '<div class="rtrack"><div class="rfill" style="width:' + pct + '%"></div></div></div>';
+    }
     function apply(s){
       var idle = document.getElementById('idle');
       var app = document.getElementById('app');
+      var result = document.getElementById('result');
       if(s.mode === 'playing'){
-        idle.style.display = 'none';
+        idle.style.display = 'none'; result.style.display = 'none';
         app.style.display = 'flex';
         document.getElementById('singer').textContent = s.singer || '';
         document.getElementById('note').textContent = s.note || '–';
@@ -102,8 +133,18 @@ const String stagePageHtml = r'''<!doctype html>
         document.getElementById('meterFill').style.width = (lvl * 100) + '%';
         if(s.videoId) loadVideo(s.videoId);
         renderBoard(s.scoreboard);
+      } else if(s.mode === 'result'){
+        app.style.display = 'none'; idle.style.display = 'none';
+        result.style.display = 'flex';
+        document.getElementById('rSinger').textContent = s.singer || '';
+        document.getElementById('rSong').textContent = s.song || '';
+        document.getElementById('rScore').textContent = (s.score != null ? s.score : 0);
+        document.getElementById('rLabel').textContent = ratingLabel(s.score || 0);
+        document.getElementById('rBars').innerHTML =
+          bar('Mitsing-Anteil', s.mitsing) + bar('Tonstabilität', s.ton) + bar('Klarheit', s.klar);
+        stopVideo();
       } else {
-        app.style.display = 'none';
+        app.style.display = 'none'; result.style.display = 'none';
         idle.style.display = 'flex';
         renderBoard(s.scoreboard);
         stopVideo();
@@ -131,7 +172,7 @@ const String stagePageHtml = r'''<!doctype html>
       src.buffer = buf;
       src.connect(audioCtx.destination);
       var now = audioCtx.currentTime;
-      if(nextTime < now + 0.02){ nextTime = now + 0.08; }
+      if(nextTime < now + 0.01){ nextTime = now + 0.04; }
       src.start(nextTime);
       nextTime += buf.duration;
     }

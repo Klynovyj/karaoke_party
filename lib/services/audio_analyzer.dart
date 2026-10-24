@@ -91,6 +91,10 @@ class AudioAnalyzer {
   }
 
   void _onBytes(Uint8List chunk) {
+    // PA-Modus: rohe Chunks SOFORT weiterreichen (geringere Latenz als das
+    // 2048er-Fenster, das nur die Tonhöhen-Erkennung braucht).
+    if (!_frames.isClosed) _frames.add(chunk);
+
     _buffer.add(chunk);
     if (_buffer.length < kFrameBytes) return;
 
@@ -102,7 +106,6 @@ class AudioAnalyzer {
         Uint8List.sublistView(all, offset, offset + kFrameBytes),
       );
       _toIsolate?.send(frame);
-      if (!_frames.isClosed) _frames.add(frame);
       offset += kFrameBytes;
     }
     if (offset < all.length) {

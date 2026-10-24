@@ -187,6 +187,28 @@ class StageServer {
     _broadcast();
   }
 
+  /// Zeigt das Ergebnis nach einem Lied auf dem TV (großer Score + Balken).
+  void setResult({
+    required String singer,
+    required String song,
+    required int score,
+    required double mitsing,
+    required double ton,
+    required double klar,
+  }) {
+    _state = {
+      'mode': 'result',
+      'singer': singer,
+      'song': song,
+      'score': score,
+      'mitsing': mitsing,
+      'ton': ton,
+      'klar': klar,
+      'scoreboard': _state['scoreboard'] ?? <dynamic>[],
+    };
+    _broadcast();
+  }
+
   void _broadcast() {
     final msg = jsonEncode(_state);
     for (final c in _clients) {

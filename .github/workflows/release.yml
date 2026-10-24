@@ -33,7 +33,15 @@ jobs:
       - run: flutter --version
       - run: flutter pub get
 
+      - name: Decode keystore
+        run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > "$RUNNER_TEMP/release.jks"
+
       - name: Build release APK
+        env:
+          KEYSTORE_FILE: ${{ runner.temp }}/release.jks
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
           TAG="${{ github.event.inputs.tag || github.ref_name }}"
           flutter build apk --release --build-name="${TAG#v}" --dart-define=YT_API_KEY=${{ secrets.YT_API_KEY }}

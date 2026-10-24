@@ -41,6 +41,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
 
   late final StageServer _stageServer;
   bool _streaming = false; // TV-Streaming (LAN) aktiv?
+  bool _finishedWithResult = false;
 
   final List<double?> _history = [];
   final List<PitchSample> _collected = [];
@@ -116,7 +117,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
 
   @override
   void dispose() {
-    if (_streaming) _stageServer.setIdle();
+    if (_streaming && !_finishedWithResult) _stageServer.setIdle();
     _restoreSystemUi();
     _sampleSub?.cancel();
     _framesSub?.cancel();
@@ -165,7 +166,18 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
           song: widget.args.song,
           result: result,
         );
-    if (_streaming) _pushScoreboard();
+    if (_streaming) {
+      _pushScoreboard();
+      _stageServer.setResult(
+        singer: widget.args.singer.name,
+        song: widget.args.song.title,
+        score: result.score,
+        mitsing: result.mitsingAnteil,
+        ton: result.tonstabilitaet,
+        klar: result.klarheit,
+      );
+      _finishedWithResult = true;
+    }
     if (!mounted) return;
     context.pushReplacement('/result', extra: perf);
   }
