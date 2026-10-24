@@ -41,6 +41,9 @@ class ResultScreen extends ConsumerWidget {
                 style: theme.textTheme.displayLarge
                     ?.copyWith(color: theme.colorScheme.primary)),
             const Text('Punkte', textAlign: TextAlign.center),
+            const SizedBox(height: 4),
+            Text(_ratingLabel(performance.score),
+                textAlign: TextAlign.center, style: theme.textTheme.titleMedium),
             const SizedBox(height: 24),
             _Bar(label: 'Mitsing-Anteil', value: performance.mitsingAnteil),
             _Bar(label: 'Tonstabilität', value: performance.tonstabilitaet),
@@ -51,7 +54,7 @@ class ResultScreen extends ConsumerWidget {
               child: const Padding(
                 padding: EdgeInsets.all(12),
                 child: Text(
-                  'Demo-Score (M1). Die echte Mikrofon-Bewertung kommt in M2/M3.',
+                  'Bewertung aus deinem Gesang: Mitsing-Anteil, Tonstabilität und Klarheit.',
                   textAlign: TextAlign.center,
                 ),
               ),
@@ -73,6 +76,14 @@ class ResultScreen extends ConsumerWidget {
       ),
     );
   }
+}
+
+String _ratingLabel(int score) {
+  if (score >= 85) return '🌟 Superstar';
+  if (score >= 70) return 'Stark!';
+  if (score >= 50) return 'Solide';
+  if (score >= 30) return 'Geht noch';
+  return 'Mutig!';
 }
 
 class _Bar extends StatelessWidget {

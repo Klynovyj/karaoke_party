@@ -16,7 +16,8 @@ const _uuid = Uuid();
 
 final youtubeServiceProvider = Provider<YoutubeService>((ref) => YoutubeService());
 
-final scoringServiceProvider = Provider<ScoringService>((ref) => DemoScoringService());
+final scoringServiceProvider =
+    Provider<ScoringService>((ref) => HeuristicScoringService());
 
 // --- Spieler (global über Abende hinweg) ------------------------------------
 

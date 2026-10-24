@@ -84,7 +84,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     setState(() => _scoring = true);
     await _analyzer.stop();
     await _controller?.pauseVideo();
-    final result = await ref.read(scoringServiceProvider).analyze();
+    final result = ref.read(scoringServiceProvider).analyze(_collected);
     final perf = ref.read(sessionProvider.notifier).recordPerformance(
           playerId: widget.args.singer.id,
           song: widget.args.song,
