@@ -24,7 +24,8 @@ android {
         applicationId = "com.klynovyj.karaoke_party"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = flutter.minSdkVersion
+        // record + WebView-Player brauchen ein etwas höheres Minimum.
+        minSdk = maxOf(24, flutter.minSdkVersion)
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
