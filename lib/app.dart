@@ -13,6 +13,10 @@ class KaraokePartyApp extends StatelessWidget {
       theme: AppTheme.dark,
       routerConfig: router,
       debugShowCheckedModeBanner: false,
+      builder: (context, child) => DecoratedBox(
+        decoration: const BoxDecoration(gradient: AppColors.backgroundGradient),
+        child: child ?? const SizedBox.shrink(),
+      ),
     );
   }
 }

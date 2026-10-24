@@ -11,6 +11,7 @@ import '../core/pitch_util.dart';
 import '../providers.dart';
 import '../router.dart';
 import '../services/audio_analyzer.dart';
+import '../widgets/brand.dart';
 
 class PlayerScreen extends ConsumerStatefulWidget {
   final PlayArgs args;
@@ -27,16 +28,14 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   /// WebView-Player gibt es nur auf Android/iOS. Auf Desktop zeigen wir einen
   /// Platzhalter, der Mikrofon-Teil (M2) läuft aber trotzdem.
   final bool _supportsVideo = Platform.isAndroid || Platform.isIOS;
-  StreamSubscription<PitchSample>? _sampleSub;
 
+  StreamSubscription<PitchSample>? _sampleSub;
   bool _scoring = false;
+  bool _stage = false; // Bühnen-/TV-Modus (für Mirroring)
   bool? _micGranted;
   PitchSample? _last;
 
-  /// Letzte erkannte Frequenzen (null = Stille) für die Live-Kurve.
   final List<double?> _history = [];
-
-  /// Alle Samples dieser Runde – Grundlage für die Bewertung ab M3.
   final List<PitchSample> _collected = [];
 
   @override
@@ -57,7 +56,6 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     if (!mounted) return;
     setState(() => _micGranted = granted);
     if (!granted) return;
-
     await _analyzer.start();
     _sampleSub = _analyzer.samples.listen(_onSample);
   }
@@ -96,11 +94,24 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
 
   @override
   Widget build(BuildContext context) {
+    return _stage ? _buildStage(context) : _buildNormal(context);
+  }
+
+  // --- Normaler Modus -------------------------------------------------------
+
+  Widget _buildNormal(BuildContext context) {
     final singer = widget.args.singer;
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.args.song.title,
             maxLines: 1, overflow: TextOverflow.ellipsis),
+        actions: [
+          IconButton(
+            tooltip: 'Bühnen-Modus (für TV)',
+            icon: const Icon(Icons.fullscreen),
+            onPressed: () => setState(() => _stage = true),
+          ),
+        ],
       ),
       body: Column(
         children: [
@@ -122,22 +133,141 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
           Expanded(child: _buildMicSection()),
           Padding(
             padding: const EdgeInsets.all(24),
-            child: SizedBox(
-              width: double.infinity,
-              child: FilledButton.icon(
-                onPressed: _scoring ? null : _finish,
-                icon: _scoring
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.check),
-                label: Text(_scoring ? 'Bewerte…' : 'Fertig & bewerten'),
-              ),
-            ),
+            child: _finishButton(),
           ),
         ],
+      ),
+    );
+  }
+
+  // --- Bühnen-/TV-Modus -----------------------------------------------------
+
+  Widget _buildStage(BuildContext context) {
+    final theme = Theme.of(context);
+    final singer = widget.args.singer;
+    final freq = _last?.frequencyHz;
+    final note = noteNameFromHz(freq);
+    final level = ((_last?.level ?? 0) * 4).clamp(0.0, 1.0);
+
+    return Scaffold(
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            children: [
+              Align(
+                alignment: Alignment.centerRight,
+                child: IconButton(
+                  tooltip: 'Bühnen-Modus beenden',
+                  icon: const Icon(Icons.fullscreen_exit),
+                  onPressed: () => setState(() => _stage = false),
+                ),
+              ),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: _buildVideoArea(context),
+              ),
+              const SizedBox(height: 16),
+              GradientText(
+                singer.name,
+                style: theme.textTheme.headlineMedium
+                    ?.copyWith(fontWeight: FontWeight.w800),
+              ),
+              const SizedBox(height: 8),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(note,
+                      style: theme.textTheme.displayMedium?.copyWith(
+                          color: theme.colorScheme.primary,
+                          fontWeight: FontWeight.w700)),
+                  const SizedBox(width: 16),
+                  Text(freq == null ? '' : '${freq.toStringAsFixed(0)} Hz',
+                      style: theme.textTheme.titleMedium),
+                ],
+              ),
+              const SizedBox(height: 12),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: LinearProgressIndicator(value: level, minHeight: 12),
+              ),
+              const SizedBox(height: 16),
+              Expanded(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(
+                      flex: 2,
+                      child: CustomPaint(
+                        painter: _PitchSparkline(
+                            history: _history, color: theme.colorScheme.primary),
+                        size: Size.infinite,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(flex: 1, child: _buildScoreboard(context)),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              _finishButton(),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildScoreboard(BuildContext context) {
+    final ranking = ref.watch(rankingProvider);
+    final theme = Theme.of(context);
+    if (ranking.isEmpty) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text('Punktestand', style: theme.textTheme.titleSmall),
+        const SizedBox(height: 8),
+        Expanded(
+          child: ListView(
+            children: ranking
+                .take(6)
+                .map((r) => Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 3),
+                      child: Row(
+                        children: [
+                          CircleAvatar(radius: 9, backgroundColor: r.player.color),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(r.player.name,
+                                maxLines: 1, overflow: TextOverflow.ellipsis),
+                          ),
+                          Text('${r.total}',
+                              style: const TextStyle(fontWeight: FontWeight.bold)),
+                        ],
+                      ),
+                    ))
+                .toList(),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // --- Gemeinsame Bausteine -------------------------------------------------
+
+  Widget _finishButton() {
+    return SizedBox(
+      width: double.infinity,
+      child: FilledButton.icon(
+        onPressed: _scoring ? null : _finish,
+        icon: _scoring
+            ? const SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : const Icon(Icons.check),
+        label: Text(_scoring ? 'Bewerte…' : 'Fertig & bewerten'),
       ),
     );
   }
@@ -151,16 +281,17 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     return AspectRatio(
       aspectRatio: 16 / 9,
       child: Container(
-        color: theme.colorScheme.surfaceContainerHighest,
-        child: const Center(
+        color: Colors.white.withValues(alpha: 0.05),
+        child: Center(
           child: Padding(
-            padding: EdgeInsets.all(16),
+            padding: const EdgeInsets.all(16),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.desktop_windows, size: 40),
-                SizedBox(height: 8),
-                Text(
+                Icon(Icons.desktop_windows,
+                    size: 40, color: theme.colorScheme.primary),
+                const SizedBox(height: 8),
+                const Text(
                   'Video-Wiedergabe nur auf Android/iOS.\n'
                   'Der Mikrofon-Test läuft hier trotzdem.',
                   textAlign: TextAlign.center,
@@ -185,7 +316,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
             const Text('Mikrofon-Berechtigung nötig, um den Gesang zu erfassen.',
                 textAlign: TextAlign.center),
             const SizedBox(height: 12),
-            OutlinedButton(onPressed: _initMic, child: const Text('Erneut anfragen')),
+            OutlinedButton(
+                onPressed: _initMic, child: const Text('Erneut anfragen')),
           ],
         ),
       );
@@ -208,7 +340,6 @@ class _PitchPanel extends StatelessWidget {
     final theme = Theme.of(context);
     final freq = last?.frequencyHz;
     final note = noteNameFromHz(freq);
-    // RMS ist klein – für die Anzeige etwas verstärken.
     final level = ((last?.level ?? 0) * 4).clamp(0.0, 1.0);
 
     return Padding(
@@ -279,7 +410,8 @@ class _PitchSparkline extends CustomPainter {
 
   double? _y(double? f, double h) {
     if (f == null || f <= 0) return null;
-    final t = ((log(f) - log(_minHz)) / (log(_maxHz) - log(_minHz))).clamp(0.0, 1.0);
+    final t =
+        ((log(f) - log(_minHz)) / (log(_maxHz) - log(_minHz))).clamp(0.0, 1.0);
     return h - t * h; // höhere Töne weiter oben
   }
 
