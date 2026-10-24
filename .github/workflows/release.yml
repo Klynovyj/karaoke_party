@@ -34,7 +34,9 @@ jobs:
       - run: flutter pub get
 
       - name: Build release APK
-        run: flutter build apk --release --dart-define=YT_API_KEY=${{ secrets.YT_API_KEY }}
+        run: |
+          TAG="${{ github.event.inputs.tag || github.ref_name }}"
+          flutter build apk --release --build-name="${TAG#v}" --dart-define=YT_API_KEY=${{ secrets.YT_API_KEY }}
 
       - name: Resolve tag
         id: tag

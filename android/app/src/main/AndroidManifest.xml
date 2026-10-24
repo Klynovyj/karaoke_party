@@ -2,6 +2,7 @@
 
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.RECORD_AUDIO"/>
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>
 
     <!-- Auch auf Android-TV (ohne Touch) installierbar -->
     <uses-feature android:name="android.software.leanback" android:required="false"/>

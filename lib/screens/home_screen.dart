@@ -5,12 +5,26 @@ import 'package:go_router/go_router.dart';
 import '../core/config.dart';
 import '../providers.dart';
 import '../widgets/brand.dart';
+import '../widgets/update_prompt.dart';
 
-class HomeScreen extends ConsumerWidget {
+class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends ConsumerState<HomeScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) maybePromptUpdate(context);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final players = ref.watch(playersProvider);
     final session = ref.watch(sessionProvider);
     final theme = Theme.of(context);

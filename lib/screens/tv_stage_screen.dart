@@ -4,6 +4,7 @@ import 'package:webview_flutter_android/webview_flutter_android.dart';
 
 import '../services/tv_discovery.dart';
 import '../widgets/brand.dart';
+import '../widgets/update_prompt.dart';
 
 /// Läuft auf dem Android-TV (waipu-Stick): sucht das Handy automatisch im WLAN
 /// und zeigt die Bühnenseite im Vollbild-WebView.
@@ -24,6 +25,9 @@ class _TvStageScreenState extends State<TvStageScreen> {
   void initState() {
     super.initState();
     _start();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) maybePromptUpdate(context);
+    });
   }
 
   Future<void> _start() async {
