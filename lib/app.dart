@@ -1,0 +1,18 @@
+import 'package:flutter/material.dart';
+
+import 'core/theme.dart';
+import 'router.dart';
+
+class KaraokePartyApp extends StatelessWidget {
+  const KaraokePartyApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp.router(
+      title: 'Karaoke Party',
+      theme: AppTheme.dark,
+      routerConfig: router,
+      debugShowCheckedModeBanner: false,
+    );
+  }
+}
