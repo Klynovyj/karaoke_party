@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webview_flutter_android/webview_flutter_android.dart';
 
@@ -24,6 +25,7 @@ class _TvStageScreenState extends State<TvStageScreen> {
   @override
   void initState() {
     super.initState();
+    WakelockPlus.enable(); // TV-Bildschirm wachhalten
     _start();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) maybePromptUpdate(context);
@@ -60,6 +62,7 @@ class _TvStageScreenState extends State<TvStageScreen> {
 
   @override
   void dispose() {
+    WakelockPlus.disable();
     _discovery.stop();
     super.dispose();
   }

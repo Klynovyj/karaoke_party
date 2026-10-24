@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:youtube_player_iframe/youtube_player_iframe.dart';
 
 import '../core/pitch_util.dart';
@@ -49,6 +50,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   @override
   void initState() {
     super.initState();
+    WakelockPlus.enable(); // Bildschirm beim Singen wachhalten
     _stageServer = ref.read(stageServerProvider);
     _streaming = _stageServer.isRunning;
     // Beim TV-Streaming läuft das Video auf dem TV – lokal kein zweiter Ton.
@@ -118,6 +120,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   @override
   void dispose() {
     if (_streaming && !_finishedWithResult) _stageServer.setIdle();
+    WakelockPlus.disable();
     _restoreSystemUi();
     _sampleSub?.cancel();
     _framesSub?.cancel();

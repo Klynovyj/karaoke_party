@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 
 import '../providers.dart';
 import '../services/stage_server.dart';
@@ -31,6 +32,7 @@ class _TvStreamScreenState extends ConsumerState<TvStreamScreen> {
   @override
   void initState() {
     super.initState();
+    WakelockPlus.enable();
     _server = ref.read(stageServerProvider);
     _sub = _server.changes.listen((_) {
       if (mounted) setState(() {});
@@ -43,6 +45,7 @@ class _TvStreamScreenState extends ConsumerState<TvStreamScreen> {
 
   @override
   void dispose() {
+    WakelockPlus.disable();
     // Server bewusst NICHT stoppen – er soll beim Singen weiterlaufen.
     _sub?.cancel();
     _scanSub?.cancel();
