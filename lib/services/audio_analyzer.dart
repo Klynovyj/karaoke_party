@@ -67,17 +67,22 @@ class AudioAnalyzer {
     _isolate = await Isolate.spawn(_pitchWorker, _fromIsolate!.sendPort);
     _toIsolate = await ready.future;
 
-    // 2) Mikrofon-Stream starten.
-    final stream = await _recorder.startStream(
-      const RecordConfig(
-        encoder: AudioEncoder.pcm16bits,
-        sampleRate: kSampleRate,
-        numChannels: 1,
-        echoCancel: true,
-        noiseSuppress: true,
-      ),
-    );
-    _micSub = stream.listen(_onBytes);
+    // 2) Mikrofon-Stream starten. Fehlt ein Aufnahmegerät, sauber aufräumen.
+    try {
+      final stream = await _recorder.startStream(
+        const RecordConfig(
+          encoder: AudioEncoder.pcm16bits,
+          sampleRate: kSampleRate,
+          numChannels: 1,
+          echoCancel: true,
+          noiseSuppress: true,
+        ),
+      );
+      _micSub = stream.listen(_onBytes);
+    } catch (_) {
+      await stop();
+      rethrow;
+    }
   }
 
   void _onBytes(Uint8List chunk) {

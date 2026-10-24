@@ -34,6 +34,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   bool _scoring = false;
   bool _stage = false; // lokaler Bühnen-Modus (für Mirroring)
   bool? _micGranted;
+  String? _micMessage;
   PitchSample? _last;
 
   late final StageServer _stageServer;
@@ -63,12 +64,30 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   }
 
   Future<void> _initMic() async {
-    final granted = await _analyzer.hasPermission();
+    bool granted = false;
+    try {
+      granted = await _analyzer.hasPermission();
+    } catch (_) {
+      granted = false;
+    }
     if (!mounted) return;
-    setState(() => _micGranted = granted);
+    setState(() {
+      _micGranted = granted;
+      _micMessage = granted
+          ? null
+          : 'Mikrofon-Berechtigung nötig, um den Gesang zu erfassen.';
+    });
     if (!granted) return;
-    await _analyzer.start();
-    _sampleSub = _analyzer.samples.listen(_onSample);
+    try {
+      await _analyzer.start();
+      _sampleSub = _analyzer.samples.listen(_onSample);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _micGranted = false;
+        _micMessage = 'Kein Mikrofon gefunden – ohne Aufnahmegerät gibt es keine Bewertung.';
+      });
+    }
   }
 
   void _onSample(PitchSample s) {
@@ -307,16 +326,25 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
 
   Widget _buildVideoArea(BuildContext context) {
     final theme = Theme.of(context);
+    // Video-Höhe begrenzen, sonst überläuft die Spalte auf breiten Fenstern.
+    final maxH = MediaQuery.sizeOf(context).height * 0.42;
+    Widget media;
     if (_streaming) {
-      return _videoPlaceholder(theme, Icons.cast_connected,
+      media = _videoPlaceholder(theme, Icons.cast_connected,
           'Läuft auf dem TV 📺\nSing ins Mikrofon.');
+    } else {
+      final controller = _controller;
+      media = (_supportsVideo && controller != null)
+          ? YoutubePlayer(controller: controller, aspectRatio: 16 / 9)
+          : _videoPlaceholder(theme, Icons.desktop_windows,
+              'Video-Wiedergabe nur auf Android/iOS.\nDer Mikrofon-Test läuft hier trotzdem.');
     }
-    final controller = _controller;
-    if (_supportsVideo && controller != null) {
-      return YoutubePlayer(controller: controller, aspectRatio: 16 / 9);
-    }
-    return _videoPlaceholder(theme, Icons.desktop_windows,
-        'Video-Wiedergabe nur auf Android/iOS.\nDer Mikrofon-Test läuft hier trotzdem.');
+    return Center(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxHeight: maxH),
+        child: media,
+      ),
+    );
   }
 
   Widget _videoPlaceholder(ThemeData theme, IconData icon, String text) {
@@ -350,11 +378,11 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
           children: [
             const Icon(Icons.mic_off, size: 48),
             const SizedBox(height: 12),
-            const Text('Mikrofon-Berechtigung nötig, um den Gesang zu erfassen.',
+            Text(_micMessage ?? 'Mikrofon nicht verfügbar.',
                 textAlign: TextAlign.center),
             const SizedBox(height: 12),
             OutlinedButton(
-                onPressed: _initMic, child: const Text('Erneut anfragen')),
+                onPressed: _initMic, child: const Text('Erneut versuchen')),
           ],
         ),
       );

@@ -19,7 +19,10 @@ class _TvStreamScreenState extends ConsumerState<TvStreamScreen> {
   late final StageServer _server;
   StreamSubscription<void>? _sub;
   bool _busy = false;
-  String? _url;
+  List<String> _ips = [];
+  String? _ip;
+
+  String? get _url => _ip == null ? null : 'http://$_ip:${_server.port}';
 
   @override
   void initState() {
@@ -28,7 +31,7 @@ class _TvStreamScreenState extends ConsumerState<TvStreamScreen> {
     _sub = _server.changes.listen((_) {
       if (mounted) setState(() {});
     });
-    if (_server.isRunning) _refreshUrl();
+    if (_server.isRunning) _refreshIps();
   }
 
   @override
@@ -38,16 +41,21 @@ class _TvStreamScreenState extends ConsumerState<TvStreamScreen> {
     super.dispose();
   }
 
-  Future<void> _refreshUrl() async {
-    final ip = await _server.localIp();
+  Future<void> _refreshIps() async {
+    final ips = await _server.candidateIps();
     if (!mounted) return;
-    setState(() => _url = ip == null ? null : 'http://$ip:${_server.port}');
+    setState(() {
+      _ips = ips;
+      if (_ip == null || !ips.contains(_ip)) {
+        _ip = ips.isEmpty ? null : ips.first;
+      }
+    });
   }
 
   Future<void> _start() async {
     setState(() => _busy = true);
     await _server.start();
-    await _refreshUrl();
+    await _refreshIps();
     if (mounted) setState(() => _busy = false);
   }
 
@@ -56,7 +64,8 @@ class _TvStreamScreenState extends ConsumerState<TvStreamScreen> {
     await _server.stop();
     if (mounted) {
       setState(() {
-        _url = null;
+        _ips = [];
+        _ip = null;
         _busy = false;
       });
     }
@@ -66,6 +75,7 @@ class _TvStreamScreenState extends ConsumerState<TvStreamScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final running = _server.isRunning;
+    final url = _url;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Auf TV streamen')),
@@ -90,16 +100,32 @@ class _TvStreamScreenState extends ConsumerState<TvStreamScreen> {
                       'Punktestand erscheinen auf dem TV.',
                     ),
                     const SizedBox(height: 8),
-                    Text(
-                      'Handy und TV müssen im selben WLAN sein.',
-                      style: theme.textTheme.bodySmall,
-                    ),
+                    Text('Handy und TV müssen im selben WLAN sein.',
+                        style: theme.textTheme.bodySmall),
                   ],
                 ),
               ),
             ),
             const SizedBox(height: 16),
-            if (running && _url != null) ...[
+            if (running && url != null) ...[
+              if (_ips.length > 1) ...[
+                Text('Netzwerk-Adresse', style: theme.textTheme.bodySmall),
+                const SizedBox(height: 4),
+                DropdownButtonFormField<String>(
+                  initialValue: _ip,
+                  items: [
+                    for (final ip in _ips)
+                      DropdownMenuItem(value: ip, child: Text(ip)),
+                  ],
+                  onChanged: (v) => setState(() => _ip = v),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Wähle die Adresse deines WLANs (nicht VMware/virtuelle Adapter).',
+                  style: theme.textTheme.bodySmall,
+                ),
+                const SizedBox(height: 16),
+              ],
               Center(
                 child: Container(
                   padding: const EdgeInsets.all(12),
@@ -107,7 +133,8 @@ class _TvStreamScreenState extends ConsumerState<TvStreamScreen> {
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(16),
                   ),
-                  child: QrImageView(data: _url!, version: QrVersions.auto, size: 220),
+                  child:
+                      QrImageView(data: url, version: QrVersions.auto, size: 220),
                 ),
               ),
               const SizedBox(height: 16),
@@ -115,7 +142,7 @@ class _TvStreamScreenState extends ConsumerState<TvStreamScreen> {
                 children: [
                   Expanded(
                     child: SelectableText(
-                      _url!,
+                      url,
                       style: theme.textTheme.titleMedium,
                       textAlign: TextAlign.center,
                     ),
@@ -124,7 +151,7 @@ class _TvStreamScreenState extends ConsumerState<TvStreamScreen> {
                     icon: const Icon(Icons.copy),
                     tooltip: 'Adresse kopieren',
                     onPressed: () {
-                      Clipboard.setData(ClipboardData(text: _url!));
+                      Clipboard.setData(ClipboardData(text: url));
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(content: Text('Adresse kopiert')),
                       );
@@ -133,12 +160,9 @@ class _TvStreamScreenState extends ConsumerState<TvStreamScreen> {
                 ],
               ),
               const SizedBox(height: 8),
-              Text(
-                '${_server.clientCount} TV(s) verbunden',
-                textAlign: TextAlign.center,
-                style: theme.textTheme.bodyMedium,
-              ),
-            ] else if (running && _url == null) ...[
+              Text('${_server.clientCount} TV(s) verbunden',
+                  textAlign: TextAlign.center, style: theme.textTheme.bodyMedium),
+            ] else if (running && url == null) ...[
               const Text(
                 'Keine WLAN-Adresse gefunden. Ist das Gerät mit dem WLAN verbunden?',
                 textAlign: TextAlign.center,

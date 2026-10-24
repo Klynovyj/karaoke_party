@@ -24,30 +24,53 @@ class StageServer {
   int get port => _server?.port ?? 0;
   int get clientCount => _clients.length;
 
-  /// Ermittelt die LAN-IPv4-Adresse dieses Geräts (für die TV-URL).
+  /// Beste LAN-IPv4-Adresse (echte Adapter vor virtuellen wie VMware).
   Future<String?> localIp() async {
+    final ips = await candidateIps();
+    return ips.isEmpty ? null : ips.first;
+  }
+
+  /// Alle plausiblen LAN-IPv4-Adressen, reale Adapter zuerst. Nützlich, wenn
+  /// mehrere Netzwerke (WLAN, VMware, …) existieren und der Nutzer wählen soll.
+  Future<List<String>> candidateIps() async {
+    bool isVirtual(String name) {
+      final n = name.toLowerCase();
+      return n.contains('vmware') ||
+          n.contains('vmnet') ||
+          n.contains('virtualbox') ||
+          n.contains('hyper-v') ||
+          n.contains('vethernet') ||
+          n.contains('wsl') ||
+          n.contains('docker') ||
+          n.contains('loopback') ||
+          n.contains('tailscale');
+    }
+
+    bool isPrivate(String ip) =>
+        ip.startsWith('192.168.') || ip.startsWith('10.') || ip.startsWith('172.');
+
+    final result = <String>[];
     try {
       final interfaces = await NetworkInterface.list(
         type: InternetAddressType.IPv4,
         includeLoopback: false,
       );
-      for (final nif in interfaces) {
+      final real = interfaces.where((n) => !isVirtual(n.name));
+      final virtual = interfaces.where((n) => isVirtual(n.name));
+      for (final nif in [...real, ...virtual]) {
         for (final addr in nif.addresses) {
-          final ip = addr.address;
-          if (ip.startsWith('192.168.') ||
-              ip.startsWith('10.') ||
-              ip.startsWith('172.')) {
-            return ip;
+          if (isPrivate(addr.address)) result.add(addr.address);
+        }
+      }
+      if (result.isEmpty) {
+        for (final nif in interfaces) {
+          for (final addr in nif.addresses) {
+            result.add(addr.address);
           }
         }
       }
-      for (final nif in interfaces) {
-        for (final addr in nif.addresses) {
-          return addr.address;
-        }
-      }
     } catch (_) {}
-    return null;
+    return result;
   }
 
   Future<void> start() async {
