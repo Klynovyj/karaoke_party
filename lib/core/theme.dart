@@ -47,7 +47,8 @@ class AppTheme {
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
-          minimumSize: const Size.fromHeight(52),
+          // Nur Mindesthöhe, KEINE unendliche Breite (bricht sonst in Rows).
+          minimumSize: const Size(0, 52),
           shape:
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           textStyle:
@@ -56,7 +57,7 @@ class AppTheme {
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
-          minimumSize: const Size.fromHeight(52),
+          minimumSize: const Size(0, 52),
           shape:
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         ),

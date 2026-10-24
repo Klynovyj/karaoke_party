@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:youtube_player_iframe/youtube_player_iframe.dart';
@@ -110,10 +111,28 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   @override
   void dispose() {
     if (_streaming) _stageServer.setIdle();
+    _restoreSystemUi();
     _sampleSub?.cancel();
     _analyzer.dispose();
     _controller?.close();
     super.dispose();
+  }
+
+  void _enterStage() {
+    setState(() => _stage = true);
+    SystemChrome.setPreferredOrientations(
+        [DeviceOrientation.landscapeLeft, DeviceOrientation.landscapeRight]);
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+  }
+
+  void _exitStage() {
+    setState(() => _stage = false);
+    _restoreSystemUi();
+  }
+
+  void _restoreSystemUi() {
+    SystemChrome.setPreferredOrientations(DeviceOrientation.values);
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
   }
 
   void _pushScoreboard() {
@@ -161,7 +180,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
           IconButton(
             tooltip: 'Bühnen-Modus (für TV)',
             icon: const Icon(Icons.fullscreen),
-            onPressed: () => setState(() => _stage = true),
+            onPressed: _enterStage,
           ),
         ],
       ),
@@ -203,70 +222,111 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
 
     return Scaffold(
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            children: [
-              Align(
-                alignment: Alignment.centerRight,
-                child: IconButton(
-                  tooltip: 'Bühnen-Modus beenden',
-                  icon: const Icon(Icons.fullscreen_exit),
-                  onPressed: () => setState(() => _stage = false),
-                ),
-              ),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(16),
-                child: _buildVideoArea(context),
-              ),
-              const SizedBox(height: 16),
-              GradientText(
-                singer.name,
-                style: theme.textTheme.headlineMedium
-                    ?.copyWith(fontWeight: FontWeight.w800),
-              ),
-              const SizedBox(height: 8),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(note,
-                      style: theme.textTheme.displayMedium?.copyWith(
-                          color: theme.colorScheme.primary,
-                          fontWeight: FontWeight.w700)),
-                  const SizedBox(width: 16),
-                  Text(freq == null ? '' : '${freq.toStringAsFixed(0)} Hz',
-                      style: theme.textTheme.titleMedium),
-                ],
-              ),
-              const SizedBox(height: 12),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: LinearProgressIndicator(value: level, minHeight: 12),
-              ),
-              const SizedBox(height: 16),
-              Expanded(
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Expanded(
-                      flex: 2,
-                      child: CustomPaint(
-                        painter: _PitchSparkline(
-                            history: _history, color: theme.colorScheme.primary),
-                        size: Size.infinite,
-                      ),
+        child: Stack(
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Video + Tonhöhe links (groß fürs TV)
+                Expanded(
+                  flex: 3,
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 16, 8, 16),
+                    child: Column(
+                      children: [
+                        Expanded(
+                          child: Center(
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(16),
+                              child: _stageMedia(context),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Text(note,
+                                style: theme.textTheme.displaySmall?.copyWith(
+                                    color: theme.colorScheme.primary,
+                                    fontWeight: FontWeight.w800)),
+                            const SizedBox(width: 12),
+                            Text(
+                                freq == null
+                                    ? ''
+                                    : '${freq.toStringAsFixed(0)} Hz',
+                                style: theme.textTheme.titleMedium),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(8),
+                                child: LinearProgressIndicator(
+                                    value: level, minHeight: 14),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: 16),
-                    Expanded(flex: 1, child: _buildScoreboard(context)),
-                  ],
+                  ),
                 ),
+                // Sänger + Scoreboard rechts
+                Expanded(
+                  flex: 2,
+                  child: Container(
+                    margin: const EdgeInsets.fromLTRB(8, 16, 16, 16),
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.05),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Text('singt gerade',
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                                color: Colors.white.withValues(alpha: 0.6))),
+                        const SizedBox(height: 2),
+                        GradientText(
+                          singer.name,
+                          style: theme.textTheme.headlineMedium
+                              ?.copyWith(fontWeight: FontWeight.w800),
+                        ),
+                        const SizedBox(height: 16),
+                        Expanded(child: _buildScoreboard(context)),
+                        const SizedBox(height: 8),
+                        _finishButton(),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            Positioned(
+              top: 4,
+              right: 4,
+              child: IconButton(
+                tooltip: 'Bühnen-Modus beenden',
+                icon: const Icon(Icons.fullscreen_exit),
+                onPressed: _exitStage,
               ),
-              const SizedBox(height: 12),
-              _finishButton(),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
+    );
+  }
+
+  Widget _stageMedia(BuildContext context) {
+    final controller = _controller;
+    if (!_streaming && _supportsVideo && controller != null) {
+      return YoutubePlayer(controller: controller, aspectRatio: 16 / 9);
+    }
+    return _videoPlaceholder(
+      Theme.of(context),
+      _streaming ? Icons.cast_connected : Icons.desktop_windows,
+      _streaming
+          ? 'Läuft auf dem TV 📺'
+          : 'Video-Wiedergabe nur auf Android/iOS.',
     );
   }
 
