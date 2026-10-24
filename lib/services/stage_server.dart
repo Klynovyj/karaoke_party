@@ -2,16 +2,24 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:bonsoir/bonsoir.dart';
 import 'package:shelf/shelf.dart';
 import 'package:shelf/shelf_io.dart' as io;
 import 'package:shelf_web_socket/shelf_web_socket.dart';
 
 import 'stage_page.dart';
 
+/// mDNS-Servicetyp, über den die TV-App das Handy findet.
+const String kStageServiceType = '_karaokeparty._tcp';
+
+/// Antwort auf /ping – Marker für den Netz-Scan-Fallback der TV-App.
+const String kStagePingBody = 'karaokeparty';
+
 /// Kleiner HTTP+WebSocket-Server im Handy. Serviert die TV-Bühnenseite und
 /// streamt den aktuellen Zustand (Video, Tonhöhe, Scoreboard) an alle TVs.
 class StageServer {
   HttpServer? _server;
+  BonsoirBroadcast? _mdnsBroadcast;
   final Set<dynamic> _clients = {}; // WebSocketChannel-Instanzen
   final StreamController<void> _changes = StreamController<void>.broadcast();
 
@@ -96,6 +104,7 @@ class StageServer {
     FutureOr<Response> handler(Request request) {
       final path = request.url.path;
       if (path == 'ws') return wsHandler(request);
+      if (path == 'ping') return Response.ok(kStagePingBody);
       if (path.isEmpty || path == '/' || path == 'index.html') {
         return Response.ok(stagePageHtml,
             headers: {'content-type': 'text/html; charset=utf-8'});
@@ -111,10 +120,35 @@ class StageServer {
         // Port belegt – nächsten versuchen.
       }
     }
+    await _advertise();
     _notify();
   }
 
+  /// Meldet den Server per mDNS an, damit die TV-App ihn automatisch findet.
+  Future<void> _advertise() async {
+    final server = _server;
+    if (server == null) return;
+    try {
+      final broadcast = BonsoirBroadcast(
+        service: BonsoirService(
+          name: 'Karaoke Party',
+          type: kStageServiceType,
+          port: server.port,
+        ),
+      );
+      await broadcast.initialize();
+      await broadcast.start();
+      _mdnsBroadcast = broadcast;
+    } catch (_) {
+      _mdnsBroadcast = null;
+    }
+  }
+
   Future<void> stop() async {
+    try {
+      await _mdnsBroadcast?.stop();
+    } catch (_) {}
+    _mdnsBroadcast = null;
     await _server?.close(force: true);
     _server = null;
     _clients.clear();
