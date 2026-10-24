@@ -12,6 +12,7 @@
         android:label="karaoke_party"
         android:name="${applicationName}"
         android:banner="@mipmap/ic_launcher"
+        android:usesCleartextTraffic="true"
         android:icon="@mipmap/ic_launcher">
         <activity
             android:name=".MainActivity"
