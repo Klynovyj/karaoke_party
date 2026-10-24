@@ -7,6 +7,7 @@ import 'package:qr_flutter/qr_flutter.dart';
 
 import '../providers.dart';
 import '../services/stage_server.dart';
+import '../services/tv_scanner.dart';
 
 class TvStreamScreen extends ConsumerStatefulWidget {
   const TvStreamScreen({super.key});
@@ -18,6 +19,9 @@ class TvStreamScreen extends ConsumerStatefulWidget {
 class _TvStreamScreenState extends ConsumerState<TvStreamScreen> {
   late final StageServer _server;
   StreamSubscription<void>? _sub;
+  TvScanner? _scanner;
+  StreamSubscription<List<TvDevice>>? _scanSub;
+  List<TvDevice> _tvs = [];
   bool _busy = false;
   List<String> _ips = [];
   String? _ip;
@@ -31,13 +35,18 @@ class _TvStreamScreenState extends ConsumerState<TvStreamScreen> {
     _sub = _server.changes.listen((_) {
       if (mounted) setState(() {});
     });
-    if (_server.isRunning) _refreshIps();
+    if (_server.isRunning) {
+      _refreshIps();
+      _startScan();
+    }
   }
 
   @override
   void dispose() {
     // Server bewusst NICHT stoppen – er soll beim Singen weiterlaufen.
     _sub?.cancel();
+    _scanSub?.cancel();
+    _scanner?.stop();
     super.dispose();
   }
 
@@ -52,20 +61,35 @@ class _TvStreamScreenState extends ConsumerState<TvStreamScreen> {
     });
   }
 
+  void _startScan() {
+    _scanSub?.cancel();
+    _scanner?.stop();
+    final scanner = TvScanner();
+    _scanner = scanner;
+    _scanSub = scanner.devices.listen((list) {
+      if (mounted) setState(() => _tvs = list);
+    });
+    scanner.start();
+  }
+
   Future<void> _start() async {
     setState(() => _busy = true);
     await _server.start();
     await _refreshIps();
+    _startScan();
     if (mounted) setState(() => _busy = false);
   }
 
   Future<void> _stop() async {
     setState(() => _busy = true);
     await _server.stop();
+    await _scanner?.stop();
+    _scanner = null;
     if (mounted) {
       setState(() {
         _ips = [];
         _ip = null;
+        _tvs = [];
         _busy = false;
       });
     }
@@ -94,10 +118,10 @@ class _TvStreamScreenState extends ConsumerState<TvStreamScreen> {
                     const SizedBox(height: 8),
                     const Text(
                       '1. Streaming starten.\n'
-                      '2. Am Fernseher die Adresse im Browser öffnen '
-                      '(oder den QR-Code scannen).\n'
-                      '3. Song wählen und lossingen – Video, Tonhöhe und '
-                      'Punktestand erscheinen auf dem TV.',
+                      '2. waipu-Stick: Karaoke-Party-App öffnen – er findet das '
+                      'Handy automatisch.\n'
+                      '3. Oder einen TV mit Browser auf die Adresse öffnen '
+                      '(QR scannen).',
                     ),
                     const SizedBox(height: 8),
                     Text('Handy und TV müssen im selben WLAN sein.',
@@ -119,11 +143,6 @@ class _TvStreamScreenState extends ConsumerState<TvStreamScreen> {
                   ],
                   onChanged: (v) => setState(() => _ip = v),
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  'Wähle die Adresse deines WLANs (nicht VMware/virtuelle Adapter).',
-                  style: theme.textTheme.bodySmall,
-                ),
                 const SizedBox(height: 16),
               ],
               Center(
@@ -134,18 +153,16 @@ class _TvStreamScreenState extends ConsumerState<TvStreamScreen> {
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child:
-                      QrImageView(data: url, version: QrVersions.auto, size: 220),
+                      QrImageView(data: url, version: QrVersions.auto, size: 200),
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
               Row(
                 children: [
                   Expanded(
-                    child: SelectableText(
-                      url,
-                      style: theme.textTheme.titleMedium,
-                      textAlign: TextAlign.center,
-                    ),
+                    child: SelectableText(url,
+                        style: theme.textTheme.titleMedium,
+                        textAlign: TextAlign.center),
                   ),
                   IconButton(
                     icon: const Icon(Icons.copy),
@@ -162,6 +179,7 @@ class _TvStreamScreenState extends ConsumerState<TvStreamScreen> {
               const SizedBox(height: 8),
               Text('${_server.clientCount} TV(s) verbunden',
                   textAlign: TextAlign.center, style: theme.textTheme.bodyMedium),
+              _buildTvList(theme),
             ] else if (running && url == null) ...[
               const Text(
                 'Keine WLAN-Adresse gefunden. Ist das Gerät mit dem WLAN verbunden?',
@@ -177,6 +195,46 @@ class _TvStreamScreenState extends ConsumerState<TvStreamScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildTvList(ThemeData theme) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const SizedBox(height: 20),
+        Row(
+          children: [
+            Text('Gefundene TVs im Netzwerk',
+                style: theme.textTheme.titleSmall),
+            const SizedBox(width: 8),
+            const SizedBox(
+              width: 14,
+              height: 14,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        if (_tvs.isEmpty)
+          Text('Suche läuft…', style: theme.textTheme.bodySmall)
+        else
+          ..._tvs.map((d) => ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.tv),
+                title: Text(d.name, maxLines: 1, overflow: TextOverflow.ellipsis),
+                subtitle: Text(
+                  [d.brand, if (d.address != null) d.address!].join(' · '),
+                ),
+              )),
+        const SizedBox(height: 4),
+        Text(
+          'Hinweis: Den Stream wirklich empfangen nur der waipu-Stick '
+          '(mit installierter App) und TVs mit Browser. Samsung/LG ohne '
+          'Browser lassen sich nur spiegeln (Mirroring).',
+          style: theme.textTheme.bodySmall,
+        ),
+      ],
     );
   }
 }
