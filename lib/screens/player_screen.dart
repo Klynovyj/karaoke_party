@@ -485,9 +485,14 @@ class _PitchPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final freq = last?.frequencyHz;
-    final note = noteNameFromHz(freq);
+    final reading = pitchReading(last?.frequencyHz);
+    final note = reading?.note ?? '–';
+    final cents = reading?.cents ?? 0;
+    final inTune = reading != null && cents.abs() <= 12;
     final level = ((last?.level ?? 0) * 4).clamp(0.0, 1.0);
+    final status = reading == null
+        ? 'kein Ton'
+        : (inTune ? 'sauber ✓' : (cents < 0 ? 'etwas zu tief' : 'etwas zu hoch'));
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -497,19 +502,25 @@ class _PitchPanel extends StatelessWidget {
           Row(
             children: [
               SizedBox(
-                width: 110,
+                width: 120,
                 child: Text(note,
-                    style: theme.textTheme.displaySmall
-                        ?.copyWith(color: theme.colorScheme.primary)),
+                    style: theme.textTheme.displaySmall?.copyWith(
+                      color: inTune
+                          ? const Color(0xFF34D399)
+                          : theme.colorScheme.primary,
+                      fontWeight: FontWeight.w700,
+                    )),
               ),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(freq == null ? '— Hz' : '${freq.toStringAsFixed(1)} Hz'),
-                    const SizedBox(height: 4),
+                    Text(status, style: theme.textTheme.titleMedium),
+                    const SizedBox(height: 2),
                     Text(
-                      'Konfidenz: ${((last?.probability ?? 0) * 100).round()}%',
+                      last?.frequencyHz == null
+                          ? '— Hz'
+                          : '${last!.frequencyHz!.toStringAsFixed(1)} Hz',
                       style: theme.textTheme.bodySmall,
                     ),
                   ],
@@ -517,7 +528,9 @@ class _PitchPanel extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
+          _tunerBar(context, cents, inTune, reading != null),
+          const SizedBox(height: 10),
           Row(
             children: [
               const Icon(Icons.mic, size: 18),
@@ -542,6 +555,51 @@ class _PitchPanel extends StatelessWidget {
           ),
           const SizedBox(height: 8),
         ],
+      ),
+    );
+  }
+
+  Widget _tunerBar(BuildContext context, int cents, bool inTune, bool hasPitch) {
+    final theme = Theme.of(context);
+    final color =
+        inTune ? const Color(0xFF34D399) : theme.colorScheme.primary;
+    return SizedBox(
+      height: 30,
+      child: LayoutBuilder(
+        builder: (c, box) {
+          return Stack(
+            alignment: Alignment.center,
+            children: [
+              Container(
+                height: 8,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
+              Container(
+                width: box.maxWidth * 0.14,
+                height: 8,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF34D399).withValues(alpha: 0.3),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
+              if (hasPitch)
+                Align(
+                  alignment: Alignment((cents / 50).clamp(-1.0, 1.0), 0),
+                  child: Container(
+                    width: 6,
+                    height: 26,
+                    decoration: BoxDecoration(
+                      color: color,
+                      borderRadius: BorderRadius.circular(3),
+                    ),
+                  ),
+                ),
+            ],
+          );
+        },
       ),
     );
   }

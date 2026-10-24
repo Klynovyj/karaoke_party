@@ -20,6 +20,11 @@ const String stagePageHtml = r'''<!doctype html>
   #meterWrap{flex:1;padding-bottom:3vh;}
   #meter{height:2.2vh;border-radius:999px;background:rgba(255,255,255,.15);overflow:hidden;}
   #meterFill{height:100%;width:0;background:linear-gradient(90deg,var(--v),var(--p));transition:width .08s linear;}
+  #noteCol{display:flex;flex-direction:column;gap:1vh;}
+  #tuneStatus{font-size:2.8vh;font-weight:700;min-height:3.2vh;}
+  #tuneBar{position:relative;width:34vw;max-width:520px;height:1.4vh;border-radius:999px;background:rgba(255,255,255,.12);}
+  #tuneZone{position:absolute;left:43%;width:14%;top:0;bottom:0;background:rgba(52,211,153,.3);border-radius:999px;}
+  #tuneDot{position:absolute;top:-0.5vh;width:1.2vh;height:2.4vh;border-radius:999px;background:#EC4899;left:50%;transform:translateX(-50%);transition:left .08s linear;}
   #side{flex:1;padding:4vh 2vw;background:rgba(0,0,0,.35);}
   #side h2{font-size:3vh;margin:0 0 2vh;}
   .row{display:flex;align-items:center;gap:1vw;font-size:2.6vh;padding:1vh 0;border-bottom:1px solid rgba(255,255,255,.08);}
@@ -49,7 +54,11 @@ const String stagePageHtml = r'''<!doctype html>
       <div id="overlay">
         <div id="singer"></div>
         <div id="bottom">
-          <div id="note">–</div>
+          <div id="noteCol">
+            <div id="note">–</div>
+            <div id="tuneStatus"></div>
+            <div id="tuneBar"><div id="tuneZone"></div><div id="tuneDot"></div></div>
+          </div>
           <div id="meterWrap"><div id="meter"><div id="meterFill"></div></div></div>
         </div>
       </div>
@@ -108,6 +117,12 @@ const String stagePageHtml = r'''<!doctype html>
       });
     }
 
+    function centsOf(freq){
+      if(!freq || freq <= 0) return null;
+      var midi = 69 + 12 * (Math.log(freq / 440) / Math.LN2);
+      var nearest = Math.round(midi);
+      return Math.round((midi - nearest) * 100);
+    }
     function ratingLabel(score){
       if(score >= 85) return '🌟 Superstar';
       if(score >= 70) return 'Stark!';
@@ -131,6 +146,12 @@ const String stagePageHtml = r'''<!doctype html>
         document.getElementById('note').textContent = s.note || '–';
         var lvl = Math.max(0, Math.min(1, s.level || 0));
         document.getElementById('meterFill').style.width = (lvl * 100) + '%';
+        var cents = centsOf(s.freq);
+        var inTune = cents != null && Math.abs(cents) <= 12;
+        document.getElementById('tuneStatus').textContent = cents == null ? '' : (inTune ? 'sauber ✓' : (cents < 0 ? 'etwas zu tief' : 'etwas zu hoch'));
+        var dot = document.getElementById('tuneDot');
+        if(cents == null){ dot.style.opacity = '0.3'; dot.style.left = '50%'; }
+        else { dot.style.opacity = '1'; var cc = Math.max(-50, Math.min(50, cents)); dot.style.left = (cc + 50) + '%'; dot.style.background = inTune ? '#34d399' : '#EC4899'; }
         if(s.videoId) loadVideo(s.videoId);
         renderBoard(s.scoreboard);
       } else if(s.mode === 'result'){
