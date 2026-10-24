@@ -207,6 +207,32 @@ class _TvStreamScreenState extends ConsumerState<TvStreamScreen> {
     );
   }
 
+  void _showDeviceInfo(TvDevice d) {
+    final n = d.name.toLowerCase();
+    final isTv = n.contains('waipu') || n.contains('tv') || n.contains('bravia');
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Text(d.name),
+        content: Text(isTv
+            ? 'Android-TV-Gerät. So verbindest du es: Installiere die '
+                'Karaoke-Party-App auf dem Gerät (z.B. per „Downloader"-App) und '
+                'öffne sie dort. Der TV findet das Handy dann automatisch und '
+                'zeigt die Bühne – ein direktes Anwählen vom Handy ist bei '
+                'Android-TV nicht möglich.'
+            : 'Dieses Gerät kann den Karaoke-Stream nicht empfangen (kein '
+                'passender Empfänger, z.B. ein Lautsprecher). Es funktionieren '
+                'der waipu-Stick (mit App) und TVs mit Browser.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildTvList(ThemeData theme) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -235,12 +261,14 @@ class _TvStreamScreenState extends ConsumerState<TvStreamScreen> {
                 subtitle: Text(
                   [d.brand, if (d.address != null) d.address!].join(' · '),
                 ),
+                trailing: const Icon(Icons.info_outline),
+                onTap: () => _showDeviceInfo(d),
               )),
         const SizedBox(height: 4),
         Text(
-          'Hinweis: Den Stream wirklich empfangen nur der waipu-Stick '
-          '(mit installierter App) und TVs mit Browser. Samsung/LG ohne '
-          'Browser lassen sich nur spiegeln (Mirroring).',
+          'Tippe ein Gerät an für die Verbindungs-Info. Den Stream empfangen '
+          'nur der waipu-Stick (mit installierter App) und TVs mit Browser; '
+          'Samsung/LG ohne Browser nur per Mirroring.',
           style: theme.textTheme.bodySmall,
         ),
       ],
