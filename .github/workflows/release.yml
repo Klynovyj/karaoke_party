@@ -1,0 +1,57 @@
+name: Release APK
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release-Tag (z.B. v0.1.0)'
+        required: true
+        default: 'v0.1.0'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          flutter-version: '3.41.2'
+
+      - run: flutter --version
+      - run: flutter pub get
+
+      - name: Build release APK
+        run: flutter build apk --release --dart-define=YT_API_KEY=${{ secrets.YT_API_KEY }}
+
+      - name: Resolve tag
+        id: tag
+        run: echo "name=${{ github.event.inputs.tag || github.ref_name }}" >> "$GITHUB_OUTPUT"
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.name }}
+          name: Karaoke Party ${{ steps.tag.outputs.name }}
+          files: build/app/outputs/flutter-apk/app-release.apk
+          body: |
+            Test-APK der Karaoke-Party-App.
+
+            Enthalten: YouTube-Karaoke-Suche + Player, Gesangsbewertung
+            (Mitsing-Anteil / Tonstabilität / Klarheit), Party-Modus mit
+            Rangliste, Verlauf & Highscores, TV-Streaming (LAN) und Bühnen-Modus.
+
+            Installation: APK aufs Handy laden und öffnen; wenn Android fragt,
+            die Installation aus unbekannter Quelle erlauben. Benötigt Android 7+.
