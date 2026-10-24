@@ -13,4 +13,13 @@ class Player {
   });
 
   Color get color => Color(colorValue);
+
+  Map<String, dynamic> toJson() =>
+      {'id': id, 'name': name, 'colorValue': colorValue};
+
+  factory Player.fromJson(Map<String, dynamic> j) => Player(
+        id: j['id'] as String,
+        name: j['name'] as String,
+        colorValue: j['colorValue'] as int,
+      );
 }

@@ -11,4 +11,18 @@ class Song {
     required this.artist,
     required this.thumbnailUrl,
   });
+
+  Map<String, dynamic> toJson() => {
+        'youtubeId': youtubeId,
+        'title': title,
+        'artist': artist,
+        'thumbnailUrl': thumbnailUrl,
+      };
+
+  factory Song.fromJson(Map<String, dynamic> j) => Song(
+        youtubeId: j['youtubeId'] as String,
+        title: j['title'] as String,
+        artist: j['artist'] as String? ?? '',
+        thumbnailUrl: j['thumbnailUrl'] as String? ?? '',
+      );
 }

@@ -7,6 +7,7 @@ import 'models/game_session.dart';
 import 'models/performance.dart';
 import 'models/player.dart';
 import 'models/song.dart';
+import 'services/persistence_service.dart';
 import 'services/scoring_service.dart';
 import 'services/youtube_service.dart';
 
@@ -19,6 +20,9 @@ final youtubeServiceProvider = Provider<YoutubeService>((ref) => YoutubeService(
 final scoringServiceProvider =
     Provider<ScoringService>((ref) => HeuristicScoringService());
 
+/// Wird in main() mit der von der Festplatte geladenen Instanz überschrieben.
+final persistenceProvider = Provider<PersistenceService>((ref) => PersistenceService());
+
 // --- Spieler (global über Abende hinweg) ------------------------------------
 
 const _avatarColors = <int>[
@@ -28,16 +32,22 @@ const _avatarColors = <int>[
 
 class PlayersNotifier extends Notifier<List<Player>> {
   @override
-  List<Player> build() => const [];
+  List<Player> build() => List.of(ref.read(persistenceProvider).players);
 
   void add(String name) {
     final trimmed = name.trim();
     if (trimmed.isEmpty) return;
     final color = _avatarColors[state.length % _avatarColors.length];
     state = [...state, Player(id: _uuid.v4(), name: trimmed, colorValue: color)];
+    _save();
   }
 
-  void remove(String id) => state = state.where((p) => p.id != id).toList();
+  void remove(String id) {
+    state = state.where((p) => p.id != id).toList();
+    _save();
+  }
+
+  void _save() => ref.read(persistenceProvider).setPlayers(state);
 }
 
 final playersProvider =
@@ -94,7 +104,15 @@ class SessionNotifier extends Notifier<GameSession?> {
     return perf;
   }
 
-  void end() => state = null;
+  /// Beendet den Abend und archiviert ihn (wenn gesungen wurde) im Verlauf.
+  void end() {
+    final s = state;
+    if (s != null && s.performances.isNotEmpty) {
+      ref.read(persistenceProvider).addSession(s);
+      ref.read(historyProvider.notifier).reload();
+    }
+    state = null;
+  }
 }
 
 final sessionProvider =
@@ -115,9 +133,7 @@ class RankEntry {
   });
 }
 
-final rankingProvider = Provider<List<RankEntry>>((ref) {
-  final s = ref.watch(sessionProvider);
-  if (s == null) return const [];
+List<RankEntry> rankSession(GameSession s) {
   final entries = s.players.map((p) {
     final perfs = s.performances.where((e) => e.playerId == p.id).toList();
     final total = perfs.fold<int>(0, (a, b) => a + b.score);
@@ -126,6 +142,48 @@ final rankingProvider = Provider<List<RankEntry>>((ref) {
   }).toList();
   entries.sort((a, b) => b.total.compareTo(a.total));
   return entries;
+}
+
+final rankingProvider = Provider<List<RankEntry>>((ref) {
+  final s = ref.watch(sessionProvider);
+  if (s == null) return const [];
+  return rankSession(s);
+});
+
+// --- Verlauf ----------------------------------------------------------------
+
+class HistoryNotifier extends Notifier<List<GameSession>> {
+  @override
+  List<GameSession> build() => List.of(ref.read(persistenceProvider).history);
+
+  void reload() => state = List.of(ref.read(persistenceProvider).history);
+}
+
+final historyProvider =
+    NotifierProvider<HistoryNotifier, List<GameSession>>(HistoryNotifier.new);
+
+// --- Highscores -------------------------------------------------------------
+
+class HighscoreEntry {
+  final Performance performance;
+  final Player? player;
+  const HighscoreEntry({required this.performance, this.player});
+}
+
+final highscoresProvider = Provider<List<HighscoreEntry>>((ref) {
+  final history = ref.watch(historyProvider);
+  final entries = <HighscoreEntry>[];
+  for (final s in history) {
+    for (final p in s.performances) {
+      final found = s.players.where((x) => x.id == p.playerId).toList();
+      entries.add(HighscoreEntry(
+        performance: p,
+        player: found.isEmpty ? null : found.first,
+      ));
+    }
+  }
+  entries.sort((a, b) => b.performance.score.compareTo(a.performance.score));
+  return entries.take(20).toList();
 });
 
 // --- Suche ------------------------------------------------------------------

@@ -30,4 +30,24 @@ class GameSession {
       currentSingerId: currentSingerId ?? this.currentSingerId,
     );
   }
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'startedAt': startedAt.toIso8601String(),
+        'players': players.map((e) => e.toJson()).toList(),
+        'performances': performances.map((e) => e.toJson()).toList(),
+        'currentSingerId': currentSingerId,
+      };
+
+  factory GameSession.fromJson(Map<String, dynamic> j) => GameSession(
+        id: j['id'] as String,
+        startedAt: DateTime.parse(j['startedAt'] as String),
+        players: (j['players'] as List)
+            .map((e) => Player.fromJson(e as Map<String, dynamic>))
+            .toList(),
+        performances: (j['performances'] as List)
+            .map((e) => Performance.fromJson(e as Map<String, dynamic>))
+            .toList(),
+        currentSingerId: j['currentSingerId'] as String?,
+      );
 }

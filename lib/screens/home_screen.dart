@@ -75,6 +75,18 @@ class HomeScreen extends ConsumerWidget {
                 label: const Text('Abend beenden'),
               ),
             ],
+            const SizedBox(height: 24),
+            OutlinedButton.icon(
+              onPressed: () => context.push('/history'),
+              icon: const Icon(Icons.history),
+              label: const Text('Verlauf'),
+            ),
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: () => context.push('/highscores'),
+              icon: const Icon(Icons.emoji_events),
+              label: const Text('Highscores'),
+            ),
             const Spacer(),
           ],
         ),

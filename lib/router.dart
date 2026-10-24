@@ -1,8 +1,12 @@
 import 'package:go_router/go_router.dart';
 
+import 'models/game_session.dart';
 import 'models/performance.dart';
 import 'models/player.dart';
 import 'models/song.dart';
+import 'screens/highscores_screen.dart';
+import 'screens/history_detail_screen.dart';
+import 'screens/history_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/player_screen.dart';
 import 'screens/players_screen.dart';
@@ -32,5 +36,15 @@ final router = GoRouter(
           ResultScreen(performance: state.extra as Performance),
     ),
     GoRoute(path: '/ranking', builder: (context, state) => const RankingScreen()),
+    GoRoute(path: '/history', builder: (context, state) => const HistoryScreen()),
+    GoRoute(
+      path: '/history-detail',
+      builder: (context, state) =>
+          HistoryDetailScreen(session: state.extra as GameSession),
+    ),
+    GoRoute(
+      path: '/highscores',
+      builder: (context, state) => const HighscoresScreen(),
+    ),
   ],
 );
