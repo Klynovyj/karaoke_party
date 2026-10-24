@@ -13,6 +13,7 @@ import 'screens/players_screen.dart';
 import 'screens/ranking_screen.dart';
 import 'screens/result_screen.dart';
 import 'screens/search_screen.dart';
+import 'screens/tv_stream_screen.dart';
 
 /// Argumente für den Player-Screen (per GoRouter `extra` übergeben).
 class PlayArgs {
@@ -46,5 +47,6 @@ final router = GoRouter(
       path: '/highscores',
       builder: (context, state) => const HighscoresScreen(),
     ),
+    GoRoute(path: '/tv', builder: (context, state) => const TvStreamScreen()),
   ],
 );

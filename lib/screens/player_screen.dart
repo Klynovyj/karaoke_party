@@ -11,6 +11,7 @@ import '../core/pitch_util.dart';
 import '../providers.dart';
 import '../router.dart';
 import '../services/audio_analyzer.dart';
+import '../services/stage_server.dart';
 import '../widgets/brand.dart';
 
 class PlayerScreen extends ConsumerStatefulWidget {
@@ -31,9 +32,12 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
 
   StreamSubscription<PitchSample>? _sampleSub;
   bool _scoring = false;
-  bool _stage = false; // Bühnen-/TV-Modus (für Mirroring)
+  bool _stage = false; // lokaler Bühnen-Modus (für Mirroring)
   bool? _micGranted;
   PitchSample? _last;
+
+  late final StageServer _stageServer;
+  bool _streaming = false; // TV-Streaming (LAN) aktiv?
 
   final List<double?> _history = [];
   final List<PitchSample> _collected = [];
@@ -41,12 +45,19 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   @override
   void initState() {
     super.initState();
-    if (_supportsVideo) {
+    _stageServer = ref.read(stageServerProvider);
+    _streaming = _stageServer.isRunning;
+    // Beim TV-Streaming läuft das Video auf dem TV – lokal kein zweiter Ton.
+    if (_supportsVideo && !_streaming) {
       _controller = YoutubePlayerController.fromVideoId(
         videoId: widget.args.song.youtubeId,
         autoPlay: true,
         params: const YoutubePlayerParams(showFullscreenButton: true),
       );
+    }
+    if (_streaming) {
+      _stageServer.setVideo(widget.args.song.youtubeId, widget.args.singer.name);
+      _pushScoreboard();
     }
     _initMic();
   }
@@ -63,6 +74,13 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   void _onSample(PitchSample s) {
     if (!mounted) return;
     _collected.add(s);
+    if (_streaming) {
+      _stageServer.setPitch(
+        note: noteNameFromHz(s.frequencyHz),
+        freq: s.frequencyHz,
+        level: (s.level * 4).clamp(0.0, 1.0),
+      );
+    }
     setState(() {
       _last = s;
       _history.add(s.hasPitch ? s.frequencyHz : null);
@@ -72,10 +90,24 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
 
   @override
   void dispose() {
+    if (_streaming) _stageServer.setIdle();
     _sampleSub?.cancel();
     _analyzer.dispose();
     _controller?.close();
     super.dispose();
+  }
+
+  void _pushScoreboard() {
+    final ranking = ref.read(rankingProvider);
+    _stageServer.setScoreboard([
+      for (final r in ranking)
+        {
+          'name': r.player.name,
+          'color':
+              '#${(r.player.colorValue & 0xFFFFFF).toRadixString(16).padLeft(6, '0')}',
+          'total': r.total,
+        }
+    ]);
   }
 
   Future<void> _finish() async {
@@ -88,6 +120,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
           song: widget.args.song,
           result: result,
         );
+    if (_streaming) _pushScoreboard();
     if (!mounted) return;
     context.pushReplacement('/result', extra: perf);
   }
@@ -273,11 +306,20 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   }
 
   Widget _buildVideoArea(BuildContext context) {
+    final theme = Theme.of(context);
+    if (_streaming) {
+      return _videoPlaceholder(theme, Icons.cast_connected,
+          'Läuft auf dem TV 📺\nSing ins Mikrofon.');
+    }
     final controller = _controller;
     if (_supportsVideo && controller != null) {
       return YoutubePlayer(controller: controller, aspectRatio: 16 / 9);
     }
-    final theme = Theme.of(context);
+    return _videoPlaceholder(theme, Icons.desktop_windows,
+        'Video-Wiedergabe nur auf Android/iOS.\nDer Mikrofon-Test läuft hier trotzdem.');
+  }
+
+  Widget _videoPlaceholder(ThemeData theme, IconData icon, String text) {
     return AspectRatio(
       aspectRatio: 16 / 9,
       child: Container(
@@ -288,14 +330,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.desktop_windows,
-                    size: 40, color: theme.colorScheme.primary),
+                Icon(icon, size: 40, color: theme.colorScheme.primary),
                 const SizedBox(height: 8),
-                const Text(
-                  'Video-Wiedergabe nur auf Android/iOS.\n'
-                  'Der Mikrofon-Test läuft hier trotzdem.',
-                  textAlign: TextAlign.center,
-                ),
+                Text(text, textAlign: TextAlign.center),
               ],
             ),
           ),

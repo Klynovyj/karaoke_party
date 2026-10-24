@@ -86,6 +86,12 @@ class HomeScreen extends ConsumerWidget {
                   label: const Text('Abend beenden'),
                 ),
               ],
+              const SizedBox(height: 12),
+              FilledButton.tonalIcon(
+                onPressed: () => context.push('/tv'),
+                icon: const Icon(Icons.cast),
+                label: const Text('Auf TV streamen'),
+              ),
               const SizedBox(height: 24),
               Row(
                 children: [

@@ -9,6 +9,7 @@ import 'models/player.dart';
 import 'models/song.dart';
 import 'services/persistence_service.dart';
 import 'services/scoring_service.dart';
+import 'services/stage_server.dart';
 import 'services/youtube_service.dart';
 
 const _uuid = Uuid();
@@ -22,6 +23,9 @@ final scoringServiceProvider =
 
 /// Wird in main() mit der von der Festplatte geladenen Instanz überschrieben.
 final persistenceProvider = Provider<PersistenceService>((ref) => PersistenceService());
+
+/// LAN-Server für das TV-Streaming (lebt über die ganze App-Laufzeit).
+final stageServerProvider = Provider<StageServer>((ref) => StageServer());
 
 // --- Spieler (global über Abende hinweg) ------------------------------------
 
