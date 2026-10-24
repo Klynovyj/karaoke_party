@@ -27,6 +27,15 @@ final persistenceProvider = Provider<PersistenceService>((ref) => PersistenceSer
 /// LAN-Server für das TV-Streaming (lebt über die ganze App-Laufzeit).
 final stageServerProvider = Provider<StageServer>((ref) => StageServer());
 
+/// PA-Modus: Stimme vom Handy-Mikro über den TV (experimentell).
+class PaEnabled extends Notifier<bool> {
+  @override
+  bool build() => false;
+  void set(bool value) => state = value;
+}
+
+final paEnabledProvider = NotifierProvider<PaEnabled, bool>(PaEnabled.new);
+
 // --- Spieler (global über Abende hinweg) ------------------------------------
 
 const _avatarColors = <int>[

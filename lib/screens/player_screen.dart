@@ -32,6 +32,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   final bool _supportsVideo = Platform.isAndroid || Platform.isIOS;
 
   StreamSubscription<PitchSample>? _sampleSub;
+  StreamSubscription? _framesSub;
   bool _scoring = false;
   bool _stage = false; // lokaler Bühnen-Modus (für Mirroring)
   bool? _micGranted;
@@ -82,6 +83,11 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     try {
       await _analyzer.start();
       _sampleSub = _analyzer.samples.listen(_onSample);
+      _framesSub = _analyzer.frames.listen((frame) {
+        if (_streaming && ref.read(paEnabledProvider)) {
+          _stageServer.sendAudio(frame);
+        }
+      });
     } catch (_) {
       if (!mounted) return;
       setState(() {
@@ -113,6 +119,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     if (_streaming) _stageServer.setIdle();
     _restoreSystemUi();
     _sampleSub?.cancel();
+    _framesSub?.cancel();
     _analyzer.dispose();
     _controller?.close();
     super.dispose();

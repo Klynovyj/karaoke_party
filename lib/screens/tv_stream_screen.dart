@@ -179,6 +179,15 @@ class _TvStreamScreenState extends ConsumerState<TvStreamScreen> {
               const SizedBox(height: 8),
               Text('${_server.clientCount} TV(s) verbunden',
                   textAlign: TextAlign.center, style: theme.textTheme.bodyMedium),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                value: ref.watch(paEnabledProvider),
+                onChanged: (v) => ref.read(paEnabledProvider.notifier).set(v),
+                title: const Text('Stimme über TV (PA) – experimentell'),
+                subtitle: const Text(
+                    'Deine Stimme kommt aus dem TV. Achtung: spürbare Verzögerung '
+                    'und Echo-Gefahr – Mikro nah am Mund, TV nicht zu laut.'),
+              ),
               _buildTvList(theme),
             ] else if (running && url == null) ...[
               const Text(

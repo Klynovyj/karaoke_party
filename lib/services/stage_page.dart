@@ -110,9 +110,39 @@ const String stagePageHtml = r'''<!doctype html>
       }
     }
 
+    // PA-Modus: rohe PCM16-Mikrofon-Frames vom Handy per Web-Audio abspielen.
+    var audioCtx = null, nextTime = 0;
+    function ensureAudio(){
+      if(!audioCtx){
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        nextTime = audioCtx.currentTime;
+      }
+      if(audioCtx.state === 'suspended'){ audioCtx.resume(); }
+    }
+    function playPcm(buffer){
+      ensureAudio();
+      var int16 = new Int16Array(buffer);
+      if(int16.length === 0) return;
+      var floats = new Float32Array(int16.length);
+      for(var i=0;i<int16.length;i++){ floats[i] = int16[i] / 32768; }
+      var buf = audioCtx.createBuffer(1, floats.length, 44100);
+      buf.getChannelData(0).set(floats);
+      var src = audioCtx.createBufferSource();
+      src.buffer = buf;
+      src.connect(audioCtx.destination);
+      var now = audioCtx.currentTime;
+      if(nextTime < now + 0.02){ nextTime = now + 0.08; }
+      src.start(nextTime);
+      nextTime += buf.duration;
+    }
+
     function connect(){
       var ws = new WebSocket('ws://' + location.host + '/ws');
-      ws.onmessage = function(e){ try { apply(JSON.parse(e.data)); } catch(_){} };
+      ws.binaryType = 'arraybuffer';
+      ws.onmessage = function(e){
+        if(typeof e.data === 'string'){ try { apply(JSON.parse(e.data)); } catch(_){} }
+        else { try { playPcm(e.data); } catch(_){} }
+      };
       ws.onclose = function(){ setTimeout(connect, 1500); };
       ws.onerror = function(){ try { ws.close(); } catch(_){} };
     }

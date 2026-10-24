@@ -37,6 +37,8 @@ class AudioAnalyzer {
   final AudioRecorder _recorder = AudioRecorder();
   final StreamController<PitchSample> _out =
       StreamController<PitchSample>.broadcast();
+  final StreamController<Uint8List> _frames =
+      StreamController<Uint8List>.broadcast();
   final BytesBuilder _buffer = BytesBuilder(copy: false);
 
   StreamSubscription<Uint8List>? _micSub;
@@ -46,6 +48,9 @@ class AudioAnalyzer {
   bool _running = false;
 
   Stream<PitchSample> get samples => _out.stream;
+
+  /// Rohe PCM16-Fenster (für den PA-Modus: Stimme an den TV streamen).
+  Stream<Uint8List> get frames => _frames.stream;
 
   /// Prüft (und fragt ggf. an) die Mikrofon-Berechtigung.
   Future<bool> hasPermission() => _recorder.hasPermission();
@@ -97,6 +102,7 @@ class AudioAnalyzer {
         Uint8List.sublistView(all, offset, offset + kFrameBytes),
       );
       _toIsolate?.send(frame);
+      if (!_frames.isClosed) _frames.add(frame);
       offset += kFrameBytes;
     }
     if (offset < all.length) {
@@ -123,6 +129,7 @@ class AudioAnalyzer {
   Future<void> dispose() async {
     await stop();
     await _out.close();
+    await _frames.close();
     await _recorder.dispose();
   }
 }

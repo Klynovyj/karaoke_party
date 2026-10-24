@@ -196,6 +196,16 @@ class StageServer {
     }
   }
 
+  /// Sendet rohe PCM16-Audioframes (Mikro) als Binärnachricht an alle TVs (PA-Modus).
+  void sendAudio(List<int> bytes) {
+    if (_clients.isEmpty) return;
+    for (final c in _clients) {
+      try {
+        c.sink.add(bytes);
+      } catch (_) {}
+    }
+  }
+
   void _notify() {
     if (!_changes.isClosed) _changes.add(null);
   }
