@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
@@ -20,8 +21,12 @@ class PlayerScreen extends ConsumerStatefulWidget {
 }
 
 class _PlayerScreenState extends ConsumerState<PlayerScreen> {
-  late final YoutubePlayerController _controller;
+  YoutubePlayerController? _controller;
   final AudioAnalyzer _analyzer = AudioAnalyzer();
+
+  /// WebView-Player gibt es nur auf Android/iOS. Auf Desktop zeigen wir einen
+  /// Platzhalter, der Mikrofon-Teil (M2) läuft aber trotzdem.
+  final bool _supportsVideo = Platform.isAndroid || Platform.isIOS;
   StreamSubscription<PitchSample>? _sampleSub;
 
   bool _scoring = false;
@@ -37,11 +42,13 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   @override
   void initState() {
     super.initState();
-    _controller = YoutubePlayerController.fromVideoId(
-      videoId: widget.args.song.youtubeId,
-      autoPlay: true,
-      params: const YoutubePlayerParams(showFullscreenButton: true),
-    );
+    if (_supportsVideo) {
+      _controller = YoutubePlayerController.fromVideoId(
+        videoId: widget.args.song.youtubeId,
+        autoPlay: true,
+        params: const YoutubePlayerParams(showFullscreenButton: true),
+      );
+    }
     _initMic();
   }
 
@@ -69,14 +76,14 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   void dispose() {
     _sampleSub?.cancel();
     _analyzer.dispose();
-    _controller.close();
+    _controller?.close();
     super.dispose();
   }
 
   Future<void> _finish() async {
     setState(() => _scoring = true);
     await _analyzer.stop();
-    await _controller.pauseVideo();
+    await _controller?.pauseVideo();
     final result = await ref.read(scoringServiceProvider).analyze();
     final perf = ref.read(sessionProvider.notifier).recordPerformance(
           playerId: widget.args.singer.id,
@@ -97,7 +104,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
       ),
       body: Column(
         children: [
-          YoutubePlayer(controller: _controller, aspectRatio: 16 / 9),
+          _buildVideoArea(context),
           Padding(
             padding: const EdgeInsets.all(16),
             child: Row(
@@ -131,6 +138,37 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildVideoArea(BuildContext context) {
+    final controller = _controller;
+    if (_supportsVideo && controller != null) {
+      return YoutubePlayer(controller: controller, aspectRatio: 16 / 9);
+    }
+    final theme = Theme.of(context);
+    return AspectRatio(
+      aspectRatio: 16 / 9,
+      child: Container(
+        color: theme.colorScheme.surfaceContainerHighest,
+        child: const Center(
+          child: Padding(
+            padding: EdgeInsets.all(16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.desktop_windows, size: 40),
+                SizedBox(height: 8),
+                Text(
+                  'Video-Wiedergabe nur auf Android/iOS.\n'
+                  'Der Mikrofon-Test läuft hier trotzdem.',
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
